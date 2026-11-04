@@ -1,2 +1,6 @@
 .venv
+agent/GUI/.venv/
+agent/GUI/.venv-win/
+__pycache__/
+*.pyc
 analyse_image/datas/fashion*
