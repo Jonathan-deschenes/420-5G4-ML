@@ -1,1 +1,5 @@
 build/*
+build-bindings/
+GUI/models/*.so
+GUI/models/*.pyd
+GUI/models/*.dylib
