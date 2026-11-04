@@ -11,6 +11,11 @@
 - `-d/--data-dir` is effectively required: without it `FileManager` gets empty filenames, so no data is loaded or saved.
 - `data/books.txt` and `data/users.txt` are test fixtures.
 
+## Run GUI
+- Windows: from `agent/GUI/`, launch with `py main.py` (no `.venv-win` required).
+- If `customtkinter` is missing: `py -m pip install -r requirements.txt`.
+- Headless check in the devcontainer: `cd agent/GUI && xvfb-run -a .venv/bin/python main.py`.
+
 ## Persistence formats
 - `books.txt`: `title|author|isbn|1|borrowerId` (`1` available, `0` checked out).
 - `users.txt`: `name|userId|isbn,isbn`.
