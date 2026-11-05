@@ -2,38 +2,30 @@ import customtkinter as ctk
 
 from views.composants import (
     BLANC,
+    GRIS,
     GRIS_CLAIR,
     NOIR,
     TEXTE,
     VERT,
     BoutonRond,
     ModaleAjout,
+    afficher_erreur,
     police,
 )
 
 
-UTILISATEURS_FICTIFS = [
-    {"nom": "Marie Dubois", "identifiant": "USR001", "livre": "Les Misérables"},
-    {"nom": "Jean Martin", "identifiant": "USR002", "livre": "Madame Bovary"},
-    {"nom": "Sophie Lemaire", "identifiant": "USR003", "livre": ""},
-    {"nom": "Pierre Durand", "identifiant": "USR004", "livre": "Germinal"},
-    {"nom": "Claire Bernard", "identifiant": "USR005", "livre": ""},
-    {"nom": "Marc Leroy", "identifiant": "USR006", "livre": "Les Fleurs du mal"},
-    {"nom": "Anne Moreau", "identifiant": "USR007", "livre": ""},
-    {"nom": "Alexandra Dumont", "identifiant": "USR015", "livre": ""},
-]
-
-
 class EcranUtilisateur(ctk.CTkFrame):
-    def __init__(self, master, on_ajout=None):
+    def __init__(self, master, bibliotheque):
         super().__init__(master, fg_color=BLANC, corner_radius=0)
-        self.utilisateurs = [dict(utilisateur) for utilisateur in UTILISATEURS_FICTIFS]
-        self.on_ajout = on_ajout
+        self.bibliotheque = bibliotheque
+        self.utilisateurs = []
+        self.recherche = ""
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
         self._construire()
+        self._charger_donnees()
         self._afficher_lignes()
 
     def _construire(self):
@@ -64,9 +56,31 @@ class EcranUtilisateur(ctk.CTkFrame):
         self.liste.grid(row=1, column=0, sticky="nsew")
         self.liste.grid_columnconfigure(0, weight=1)
 
+    def _charger_donnees(self):
+        self.utilisateurs = self.bibliotheque.utilisateurs.lister(
+            recherche=self.recherche
+        )
+
+    def rafraichir(self):
+        self._charger_donnees()
+        self._afficher_lignes()
+
+    def rechercher(self, texte):
+        self.recherche = texte
+        self.rafraichir()
+
     def _afficher_lignes(self):
         for enfant in self.liste.winfo_children():
             enfant.destroy()
+
+        if not self.utilisateurs:
+            ctk.CTkLabel(
+                self.liste,
+                text="Aucun utilisateur à afficher",
+                font=police(14),
+                text_color=GRIS,
+            ).grid(row=0, column=0, pady=40)
+            return
 
         for index, utilisateur in enumerate(self.utilisateurs):
             fond = GRIS_CLAIR if index % 2 == 0 else BLANC
@@ -90,15 +104,22 @@ class EcranUtilisateur(ctk.CTkFrame):
                 height=24,
             ).grid(row=0, column=0, sticky="w", padx=(44, 0))
 
-            if utilisateur["livre"]:
-                actions = ctk.CTkFrame(ligne, fg_color=fond, corner_radius=0)
-                actions.grid(row=0, column=1, sticky="e", padx=(0, 44))
+            livres = utilisateur["livres"]
+            if not livres:
+                continue
+
+            actions = ctk.CTkFrame(ligne, fg_color=fond, corner_radius=0)
+            actions.grid(row=0, column=1, sticky="e", padx=(0, 44))
+
+            for livre in livres:
+                bloc = ctk.CTkFrame(actions, fg_color=fond, corner_radius=0)
+                bloc.pack(side="right", padx=(14, 0))
 
                 BoutonRond(
-                    actions,
+                    bloc,
                     "retour",
-                    lambda utilisateur_cible=utilisateur: self._rendre_livre(
-                        utilisateur_cible
+                    lambda utilisateur_cible=utilisateur, livre_cible=livre: (
+                        self._rendre_livre(utilisateur_cible, livre_cible)
                     ),
                     fond=fond,
                     couleur_fond=NOIR,
@@ -108,9 +129,9 @@ class EcranUtilisateur(ctk.CTkFrame):
                 ).pack(side="right")
 
                 ctk.CTkLabel(
-                    actions,
-                    text=utilisateur["livre"],
-                    width=240,
+                    bloc,
+                    text=livre["titre"],
+                    width=200,
                     height=32,
                     corner_radius=16,
                     fg_color=VERT,
@@ -118,9 +139,14 @@ class EcranUtilisateur(ctk.CTkFrame):
                     font=police(13),
                 ).pack(side="right", padx=(0, 8))
 
-    def _rendre_livre(self, utilisateur):
-        utilisateur["livre"] = ""
-        self._afficher_lignes()
+    def _rendre_livre(self, utilisateur, livre):
+        if not self.bibliotheque.utilisateurs.retourner_livre(
+            utilisateur["identifiant"],
+            livre["isbn"],
+        ):
+            afficher_erreur(
+                f"Impossible de retourner « {livre['titre']} »."
+            )
 
     def ouvrir_ajout(self):
         champs = [
@@ -135,13 +161,12 @@ class EcranUtilisateur(ctk.CTkFrame):
         )
 
     def _ajouter_utilisateur(self, donnees):
-        self.utilisateurs.append(
-            {
-                "nom": donnees["nom"],
-                "identifiant": donnees["identifiant"],
-                "livre": "",
-            }
-        )
-        self._afficher_lignes()
-        if self.on_ajout is not None:
-            self.on_ajout()
+        try:
+            self.bibliotheque.utilisateurs.ajouter(
+                donnees["nom"],
+                donnees["identifiant"],
+            )
+        except ValueError as erreur:
+            afficher_erreur(str(erreur))
+            return False
+        return True

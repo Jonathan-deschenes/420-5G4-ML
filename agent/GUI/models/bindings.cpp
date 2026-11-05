@@ -88,5 +88,8 @@ PYBIND11_MODULE(bibliotheque_core, m) {
         .def("load_books_from_file", &FileManager::loadBooksFromFile, py::arg("library"))
         .def("load_users_from_file", &FileManager::loadUsersFromFile, py::arg("library"))
         .def("file_exists", &FileManager::fileExists, py::arg("filename"))
-        .def("create_backup", &FileManager::createBackup);
+        .def("create_backup", &FileManager::createBackup)
+        .def_property_readonly("books_file", &FileManager::getBooksFileName)
+        .def_property_readonly("users_file", &FileManager::getUsersFileName)
+        .def_property_readonly("last_error", &FileManager::getLastError);
 }

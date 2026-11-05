@@ -1,4 +1,15 @@
+import unicodedata
+
 from models import User
+
+
+def _normaliser(texte):
+    return (
+        unicodedata.normalize("NFKD", texte)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .casefold()
+    )
 
 
 class UtilisateurControleur:
@@ -32,12 +43,12 @@ class UtilisateurControleur:
         ]
 
         if recherche is not None and recherche.strip():
-            terme = recherche.strip().casefold()
+            terme = _normaliser(recherche.strip())
             utilisateurs = [
                 utilisateur
                 for utilisateur in utilisateurs
-                if terme in utilisateur["nom"].casefold()
-                or terme in utilisateur["identifiant"].casefold()
+                if terme in _normaliser(utilisateur["nom"])
+                or terme in _normaliser(utilisateur["identifiant"])
             ]
 
         return utilisateurs

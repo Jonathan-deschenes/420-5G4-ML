@@ -13,87 +13,25 @@ from views.composants import (
     Icone,
     MenuFiltre,
     ModaleAjout,
+    ModaleSelection,
+    afficher_erreur,
     police,
 )
 
 
-LIVRES_FICTIFS = [
-    {
-        "titre": "Le Petit Prince",
-        "auteur": "Antoine de Saint-Exupéry",
-        "isbn": "9782070612758",
-        "disponible": True,
-    },
-    {
-        "titre": "Les Misérables",
-        "auteur": "Victor Hugo",
-        "isbn": "9782253096337",
-        "disponible": False,
-    },
-    {
-        "titre": "L'Étranger",
-        "auteur": "Albert Camus",
-        "isbn": "9782070360024",
-        "disponible": True,
-    },
-    {
-        "titre": "Madame Bovary",
-        "auteur": "Gustave Flaubert",
-        "isbn": "9782070413119",
-        "disponible": False,
-    },
-    {
-        "titre": "Le Rouge et le Noir",
-        "auteur": "Stendhal",
-        "isbn": "9782070411326",
-        "disponible": True,
-    },
-    {
-        "titre": "Germinal",
-        "auteur": "Émile Zola",
-        "isbn": "9782253004226",
-        "disponible": False,
-    },
-    {
-        "titre": "Candide",
-        "auteur": "Voltaire",
-        "isbn": "9782070380015",
-        "disponible": True,
-    },
-    {
-        "titre": "Les Fleurs du mal",
-        "auteur": "Charles Baudelaire",
-        "isbn": "9782070323087",
-        "disponible": False,
-    },
-    {
-        "titre": "Notre-Dame de Paris",
-        "auteur": "Victor Hugo",
-        "isbn": "9782253002864",
-        "disponible": True,
-    },
-    {
-        "titre": "Bel-Ami",
-        "auteur": "Guy de Maupassant",
-        "isbn": "9782253005070",
-        "disponible": False,
-    },
-]
-
-STATISTIQUES_INITIALES = {
-    "total": 41,
-    "disponibles": 27,
-    "empruntes": 14,
-    "utilisateurs": 25,
-}
-
-
 class EcranLivre(ctk.CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, bibliotheque):
         super().__init__(master, fg_color=BLANC, corner_radius=0)
-        self.livres = [dict(livre) for livre in LIVRES_FICTIFS]
-        self.statistiques = dict(STATISTIQUES_INITIALES)
+        self.bibliotheque = bibliotheque
+        self.livres = []
+        self.statistiques = {
+            "total": 0,
+            "disponibles": 0,
+            "empruntes": 0,
+            "utilisateurs": 0,
+        }
         self.filtre = "Tous les livres"
+        self.recherche = ""
         self.menu_filtre = None
         self.id_clic_exterieur = None
         self.id_echap = None
@@ -103,6 +41,7 @@ class EcranLivre(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
 
         self._construire()
+        self._charger_donnees()
         self._afficher_lignes()
 
     def _construire(self):
@@ -203,20 +142,27 @@ class EcranLivre(ctk.CTkFrame):
         for cle, label in self.labels_statistiques.items():
             label.configure(text=str(self.statistiques[cle]))
 
-    def ajouter_utilisateur(self):
-        self.statistiques["utilisateurs"] += 1
+    def _charger_donnees(self):
+        self.livres = self.bibliotheque.livres.lister(
+            disponibles_seulement=self.filtre == "Seulement disponible",
+            recherche=self.recherche,
+        )
+        self.statistiques = self.bibliotheque.statistiques()
         self._maj_statistiques()
 
-    def _livres_affiches(self):
-        if self.filtre == "Seulement disponible":
-            return [livre for livre in self.livres if livre["disponible"]]
-        return self.livres
+    def rafraichir(self):
+        self._charger_donnees()
+        self._afficher_lignes()
+
+    def rechercher(self, texte):
+        self.recherche = texte
+        self.rafraichir()
 
     def _afficher_lignes(self):
         for enfant in self.liste.winfo_children():
             enfant.destroy()
 
-        livres = self._livres_affiches()
+        livres = self.livres
         if not livres:
             ctk.CTkLabel(
                 self.liste,
@@ -321,27 +267,52 @@ class EcranLivre(ctk.CTkFrame):
                 ).pack(side="right", padx=(0, 14))
 
     def _basculer_emprunt(self, livre):
-        livre["disponible"] = not livre["disponible"]
         if livre["disponible"]:
-            self.statistiques["disponibles"] += 1
-            self.statistiques["empruntes"] -= 1
+            self._emprunter(livre)
         else:
-            self.statistiques["disponibles"] -= 1
-            self.statistiques["empruntes"] += 1
-        self._maj_statistiques()
-        self._afficher_lignes()
+            self._retourner(livre)
+
+    def _emprunter(self, livre):
+        utilisateurs = self.bibliotheque.utilisateurs.lister()
+        if not utilisateurs:
+            afficher_erreur(
+                "Aucun utilisateur enregistré. Ajoutez un utilisateur "
+                "avant d'emprunter un livre."
+            )
+            return
+
+        options = [
+            (
+                utilisateur["identifiant"],
+                f"{utilisateur['nom']} ({utilisateur['identifiant']})",
+            )
+            for utilisateur in utilisateurs
+        ]
+        ModaleSelection(
+            self.winfo_toplevel(),
+            "Choisir un utilisateur",
+            options,
+            lambda identifiant: self._confirmer_emprunt(livre, identifiant),
+        )
+
+    def _confirmer_emprunt(self, livre, identifiant):
+        if not self.bibliotheque.livres.emprunter(livre["isbn"], identifiant):
+            afficher_erreur(
+                f"Impossible d'emprunter « {livre['titre']} » "
+                f"pour {identifiant}."
+            )
+
+    def _retourner(self, livre):
+        if not self.bibliotheque.livres.retourner(livre["isbn"]):
+            afficher_erreur(
+                f"Impossible de retourner « {livre['titre']} »."
+            )
 
     def _supprimer_livre(self, livre):
-        if livre not in self.livres:
-            return
-        self.livres.remove(livre)
-        self.statistiques["total"] -= 1
-        if livre["disponible"]:
-            self.statistiques["disponibles"] -= 1
-        else:
-            self.statistiques["empruntes"] -= 1
-        self._maj_statistiques()
-        self._afficher_lignes()
+        if not self.bibliotheque.livres.supprimer(livre["isbn"]):
+            afficher_erreur(
+                f"Impossible de supprimer « {livre['titre']} »."
+            )
 
     def ouvrir_ajout(self):
         self.fermer_menu_filtre()
@@ -358,18 +329,16 @@ class EcranLivre(ctk.CTkFrame):
         )
 
     def _ajouter_livre(self, donnees):
-        self.livres.append(
-            {
-                "titre": donnees["titre"],
-                "auteur": donnees["auteur"],
-                "isbn": donnees["isbn"],
-                "disponible": True,
-            }
-        )
-        self.statistiques["total"] += 1
-        self.statistiques["disponibles"] += 1
-        self._maj_statistiques()
-        self._afficher_lignes()
+        try:
+            self.bibliotheque.livres.ajouter(
+                donnees["titre"],
+                donnees["auteur"],
+                donnees["isbn"],
+            )
+        except ValueError as erreur:
+            afficher_erreur(str(erreur))
+            return False
+        return True
 
     def ouvrir_filtre(self):
         if self.menu_filtre is not None:
@@ -418,7 +387,7 @@ class EcranLivre(ctk.CTkFrame):
     def _choisir_filtre(self, option):
         self.filtre = option
         self.fermer_menu_filtre()
-        self._afficher_lignes()
+        self.rafraichir()
 
     def _clic_hors_menu(self, event):
         if self.menu_filtre is None:

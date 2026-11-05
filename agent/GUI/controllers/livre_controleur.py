@@ -1,4 +1,15 @@
+import unicodedata
+
 from models import Book
+
+
+def _normaliser(texte):
+    return (
+        unicodedata.normalize("NFKD", texte)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .casefold()
+    )
 
 
 class LivreControleur:
@@ -53,15 +64,14 @@ class LivreControleur:
         if not texte:
             return self.lister()
 
+        minuscule = _normaliser(texte)
         trouves = {}
-        for livre in self.bibliotheque.search_books_by_title(texte):
-            trouves[livre.isbn] = livre
-        for livre in self.bibliotheque.search_books_by_author(texte):
-            trouves[livre.isbn] = livre
-
-        minuscule = texte.casefold()
         for livre in self.bibliotheque.get_all_books():
-            if minuscule in livre.isbn.casefold():
+            if (
+                minuscule in _normaliser(livre.title)
+                or minuscule in _normaliser(livre.author)
+                or minuscule in _normaliser(livre.isbn)
+            ):
                 trouves[livre.isbn] = livre
 
         return [self._en_dict(livre) for livre in trouves.values()]
@@ -83,6 +93,13 @@ class LivreControleur:
         return self.obtenir(isbn)
 
     def supprimer(self, isbn):
+        if self.bibliotheque.find_book_by_isbn(isbn) is None:
+            return False
+
+        for utilisateur in self.bibliotheque.get_all_users():
+            if utilisateur.has_borrowed_book(isbn):
+                utilisateur.return_book(isbn)
+
         succes = self.bibliotheque.remove_book(isbn)
         if succes:
             self._notifier()

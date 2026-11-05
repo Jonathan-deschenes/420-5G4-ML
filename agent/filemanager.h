@@ -11,6 +11,9 @@ class FileManager {
 private:
     string booksFileName;
     string usersFileName;
+    string lastError;
+
+    bool ensureParentDirectory(const string& filename);
 
 public:
     // Constructor
@@ -28,7 +31,12 @@ public:
     
     // Utility methods
     bool fileExists(const string& filename);
-    void createBackup();
+    bool createBackup();
+
+    // Accessors
+    const string& getBooksFileName() const;
+    const string& getUsersFileName() const;
+    const string& getLastError() const;
 };
 
 #endif

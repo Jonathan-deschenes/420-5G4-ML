@@ -1,5 +1,6 @@
 import math
 import tkinter as tk
+from tkinter import messagebox
 
 import customtkinter as ctk
 
@@ -23,6 +24,10 @@ POLICE = "Segoe UI"
 
 def police(taille, poids="normal"):
     return ctk.CTkFont(family=POLICE, size=taille, weight=poids)
+
+
+def afficher_erreur(message):
+    messagebox.showerror("Erreur", message)
 
 
 def dessiner_icone(canvas, nom, taille, couleur, ox=0, oy=0, epaisseur=None):
@@ -266,8 +271,9 @@ class BoutonIconeSimple(tk.Canvas):
 
 
 class BarreRecherche(ctk.CTkFrame):
-    def __init__(self, master, placeholder):
+    def __init__(self, master, placeholder, on_change=None):
         super().__init__(master, fg_color=BLANC, corner_radius=0)
+        self.on_change = on_change
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -287,6 +293,7 @@ class BarreRecherche(ctk.CTkFrame):
             placeholder_text_color=GRIS,
         )
         self.entree.grid(row=0, column=1, sticky="ew", pady=14)
+        self.entree.bind("<KeyRelease>", self._sur_saisie)
 
         self.bouton_effacer = BoutonIconeSimple(
             self,
@@ -300,6 +307,16 @@ class BarreRecherche(ctk.CTkFrame):
 
         self.ligne = ctk.CTkFrame(self, fg_color=BORDURE, width=1, height=1, corner_radius=0)
         self.ligne.grid(row=1, column=0, columnspan=3, sticky="ew")
+
+    def _sur_saisie(self, _event):
+        self._notifier()
+
+    def _notifier(self):
+        if self.on_change is not None:
+            self.on_change(self.texte())
+
+    def texte(self):
+        return self.entree.get().strip()
 
     def definir_placeholder(self, texte):
         self.entree.configure(placeholder_text=texte)
@@ -392,6 +409,62 @@ class BarreOnglets(ctk.CTkFrame):
     def definir_actif(self, nom):
         self.onglet_livres.definir_actif(nom == "livres")
         self.onglet_utilisateurs.definir_actif(nom == "utilisateurs")
+
+
+class BarreEtat(ctk.CTkFrame):
+    def __init__(self, master, on_sauvegarder, on_sauvegarde):
+        super().__init__(master, fg_color=BLANC, corner_radius=0)
+        self.grid_columnconfigure(0, weight=1)
+
+        self.ligne = ctk.CTkFrame(
+            self,
+            fg_color=BORDURE,
+            width=1,
+            height=1,
+            corner_radius=0,
+        )
+        self.ligne.grid(row=0, column=0, columnspan=3, sticky="ew")
+
+        self.label = ctk.CTkLabel(
+            self,
+            text="",
+            font=police(11),
+            text_color=GRIS,
+            anchor="w",
+        )
+        self.label.grid(row=1, column=0, sticky="ew", padx=(44, 12), pady=(8, 10))
+
+        ctk.CTkButton(
+            self,
+            text="Enregistrer",
+            command=on_sauvegarder,
+            width=112,
+            height=30,
+            corner_radius=15,
+            fg_color=GRIS_CLAIR,
+            hover_color=GRIS_SURVOL,
+            text_color=TEXTE,
+            font=police(12),
+        ).grid(row=1, column=1, padx=(0, 4), pady=(8, 10))
+
+        ctk.CTkButton(
+            self,
+            text="Sauvegarde",
+            command=on_sauvegarde,
+            width=112,
+            height=30,
+            corner_radius=15,
+            fg_color=GRIS_CLAIR,
+            hover_color=GRIS_SURVOL,
+            text_color=TEXTE,
+            font=police(12),
+        ).grid(row=1, column=2, padx=(4, 44), pady=(8, 10))
+
+    def afficher_etat(self, texte, erreur=False):
+        self.label.configure(
+            text=texte,
+            text_color=ROUGE if erreur else GRIS,
+        )
 
 
 class MenuFiltre(ctk.CTkFrame):
@@ -565,7 +638,133 @@ class ModaleAjout(ctk.CTkToplevel):
             cle: entree.get().strip()
             for cle, entree in self.entrees.items()
         }
-        self.on_valider(donnees)
+        if self.on_valider(donnees) is False:
+            return
+        self.fermer()
+
+    def fermer(self):
+        try:
+            self.grab_release()
+        except tk.TclError:
+            pass
+        self.destroy()
+
+
+class ModaleSelection(ctk.CTkToplevel):
+    def __init__(self, parent, titre, options, on_valider):
+        super().__init__(parent, fg_color=BORDURE)
+        self.parent = parent
+        self.on_valider = on_valider
+        self.valeurs = {libelle: valeur for valeur, libelle in options}
+        self.withdraw()
+        self.overrideredirect(True)
+        self.transient(parent)
+        self.resizable(False, False)
+
+        cadre = ctk.CTkFrame(self, fg_color=BLANC, corner_radius=0)
+        cadre.pack(fill="both", expand=True, padx=1, pady=1)
+
+        entete = ctk.CTkFrame(cadre, fg_color=BLANC, corner_radius=0)
+        entete.pack(fill="x", padx=28, pady=(24, 12))
+        entete.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            entete,
+            text=titre,
+            font=police(22, "bold"),
+            text_color=TEXTE,
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w")
+
+        BoutonIconeSimple(
+            entete,
+            "fermer",
+            self.fermer,
+            fond=BLANC,
+            couleur=GRIS,
+            couleur_survol=NOIR,
+        ).grid(row=0, column=1, sticky="e")
+
+        formulaire = ctk.CTkFrame(cadre, fg_color=BLANC, corner_radius=0)
+        formulaire.pack(fill="both", expand=True, padx=28)
+
+        ctk.CTkLabel(
+            formulaire,
+            text="Utilisateur",
+            font=police(12),
+            text_color=GRIS_FONCE,
+            anchor="w",
+        ).pack(fill="x", pady=(0, 6))
+
+        libelles = list(self.valeurs.keys())
+        self.menu = ctk.CTkOptionMenu(
+            formulaire,
+            values=libelles,
+            height=42,
+            corner_radius=8,
+            fg_color=FOND_CHAMP,
+            button_color=GRIS_CLAIR,
+            button_hover_color=GRIS_SURVOL,
+            text_color=TEXTE,
+            font=police(14),
+            dropdown_font=police(14),
+        )
+        self.menu.pack(fill="x", pady=(0, 14))
+
+        actions = ctk.CTkFrame(cadre, fg_color=BLANC, corner_radius=0)
+        actions.pack(fill="x", padx=28, pady=(8, 24))
+        actions.grid_columnconfigure(0, weight=1)
+        actions.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkButton(
+            actions,
+            text="Annuler",
+            command=self.fermer,
+            height=42,
+            corner_radius=21,
+            fg_color=GRIS_CLAIR,
+            hover_color=GRIS_SURVOL,
+            text_color=TEXTE,
+            font=police(14),
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+
+        ctk.CTkButton(
+            actions,
+            text="Valider",
+            command=self.valider,
+            height=42,
+            corner_radius=21,
+            fg_color=NOIR,
+            hover_color="#2C2C2C",
+            text_color=BLANC,
+            font=police(14),
+        ).grid(row=0, column=1, sticky="ew", padx=(8, 0))
+
+        self.bind("<Escape>", lambda _event: self.fermer())
+
+        self.update_idletasks()
+        largeur = 460
+        hauteur = max(300, self.winfo_reqheight())
+        x = parent.winfo_rootx() + (parent.winfo_width() - largeur) // 2
+        y = parent.winfo_rooty() + (parent.winfo_height() - hauteur) // 2
+        self.geometry(f"{largeur}x{hauteur}+{x}+{y}")
+        self.deiconify()
+        self.lift()
+        self.after(30, self._activer)
+
+    def _activer(self):
+        try:
+            self.grab_set()
+        except tk.TclError:
+            pass
+        self.focus_force()
+
+    def valider(self):
+        libelle = self.menu.get()
+        valeur = self.valeurs.get(libelle)
+        if valeur is None:
+            return
+        self.on_valider(valeur)
         self.fermer()
 
     def fermer(self):
