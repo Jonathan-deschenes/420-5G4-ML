@@ -10,6 +10,7 @@ pybind11_add_module(bibliotheque_core
     ../../book.cpp
     ../../user.cpp
     ../../library.cpp
+    ../../filemanager.cpp
 )
 
 target_include_directories(bibliotheque_core PRIVATE ../..)

@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 
 #include "book.h"
+#include "filemanager.h"
 #include "library.h"
 #include "user.h"
 
@@ -76,4 +77,16 @@ PYBIND11_MODULE(bibliotheque_core, m) {
             return "Library(total_books=" + std::to_string(library.getTotalBooks()) +
                    ", available_books=" + std::to_string(library.getAvailableBookCount()) + ")";
         });
+
+    py::class_<FileManager>(m, "FileManager")
+        .def(py::init<const std::string&, const std::string&>(),
+             py::arg("books_file"), py::arg("users_file"))
+        .def("save_library_data", &FileManager::saveLibraryData, py::arg("library"))
+        .def("load_library_data", &FileManager::loadLibraryData, py::arg("library"))
+        .def("save_books_to_file", &FileManager::saveBooksToFile, py::arg("library"))
+        .def("save_users_to_file", &FileManager::saveUsersToFile, py::arg("library"))
+        .def("load_books_from_file", &FileManager::loadBooksFromFile, py::arg("library"))
+        .def("load_users_from_file", &FileManager::loadUsersFromFile, py::arg("library"))
+        .def("file_exists", &FileManager::fileExists, py::arg("filename"))
+        .def("create_backup", &FileManager::createBackup);
 }
