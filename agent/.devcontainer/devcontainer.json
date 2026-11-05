@@ -6,25 +6,14 @@
 		"dockerfile": "Dockerfile"
 	},
 
-	// ===================================================================================================
-	//
-	// Section X11 commenter car l'utilisation est faite sur Windows et fonctionne avec /GUI/.venv-win
-	//
-	// ===================================================================================================
-	
 	// Monter le socket X11 hôte dans le conteneur
-	//   "mounts": [
-	//     "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind"
-	//   ],
-  
-  	// Transmettre la variable d'affichage
-	//   "containerEnv": {
-	//     "DISPLAY": "${localEnv:DISPLAY}"
-	//   },
-  
-  // Donner l'accès au serveur X11 (si nécessaire sur certains systèmes)
-	//   "runArgs": [
-	//     "--net=host"
-	//   ],
+	"mounts": ["source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind"],
 
+	// Transmettre la variable d'affichage
+	"containerEnv": {
+		"DISPLAY": "${localEnv:DISPLAY}"
+	},
+
+	// Donner l'accès au serveur X11 (si nécessaire sur certains systèmes)
+	"runArgs": ["--net=host"]
 }
